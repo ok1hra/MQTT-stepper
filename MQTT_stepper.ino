@@ -35,29 +35,34 @@ Features:
 
 Changelog:
 ----------
+2021-12 mqtt lib bugfix
+2020-11 add L switch feature
 2020-10 first initial version
 
 USB debug (if enable)
 --------------------
 screen /dev/ttyUSB.mm 115200
+stty -F /dev/ttyUSB.mm 115200 && screen /dev/ttyUSB.mm
 
 MQTT monitor
 ------------
-mosquitto_sub -v -h 54.38.157.134 -t 'OK1HRA/sm/#'
+mosquitto_sub -v -h 192.168.1.200 -t 'OK1HRA/sm/#'
 
 MQTT topic
 ------------
-mosquitto_pub -h 54.38.157.134 -t OK1HRA/sm/0/sTarget -m '10' // storage last stepper stop memory, do not use
-mosquitto_pub -h 54.38.157.134 -t OK1HRA/sm/0/Target -m '100'  // set new target 0-SteppersCounterLimit
-mosquitto_pub -h 54.38.157.134 -t OK1HRA/sm/0/Target -m '+'   // increment or decrement with "-"
-mosquitto_pub -h 54.38.157.134 -t OK1HRA/sm/0/Target -m 'H'   // homing to endstop and return to last target position
-mosquitto_pub -h 54.38.157.134 -t OK1HRA/sm/0/Target -m '?'   // return raw temperature
+mosquitto_pub -h 192.168.1.200 -t OK1HRA/sm/0/sTarget -m '10'  // storage last stepper stop memory, do not use
+mosquitto_pub -h 192.168.1.200 -t OK1HRA/sm/0/Target -m '100'  // set new target 0-SteppersCounterLimit
+mosquitto_pub -h 192.168.1.200 -t OK1HRA/sm/0/Target -m '+'    // increment or decrement with "-"
+mosquitto_pub -h 192.168.1.200 -t OK1HRA/sm/0/Target -m 'H'    // homing to endstop and return to last target position
+mosquitto_pub -h 192.168.1.200 -t OK1HRA/sm/0/Target -m '?'    // return raw temperature
 
 Retain message can be use for preset
-mosquitto_pub -h 54.38.157.134 -t OK1HRA/sm/0/sSteppersCounterLimit -m '1000'
-mosquitto_pub -h 54.38.157.134 -t OK1HRA/sm/0/sCurrentRun -m '20'
-mosquitto_pub -h 54.38.157.134 -t OK1HRA/sm/0/sReverse -m '1'
-mosquitto_pub -h 54.38.157.134 -t OK1HRA/sm/0/sMicroSteps -m '16' // off, because low memory space
+mosquitto_pub -h 192.168.1.200 -t OK1HRA/sm/0/sReverse -m '1'
+mosquitto_pub -h 192.168.1.200 -t OK1HRA/sm/0/sSteppersCounterLimit -m '1000'
+mosquitto_pub -h 192.168.1.200 -t OK1HRA/sm/0/sCurrentRun -m '20'
+mosquitto_pub -h 192.168.1.200 -t OK1HRA/sm/0/sL -m '1' -r     // L switch match to HIGH impedance | 0 = LC, 1 = CL
+
+mosquitto_pub -h 192.168.1.200 -t OK1HRA/sm/0/sMicroSteps -m '16' // off, because low memory space
 
 TIP:
 ----
@@ -71,7 +76,6 @@ How to setup
 - compile for Arduino Leonardo and upload via ICSP programmer
 - control via selected mqtt broker
 
-
 // Configure setting //////////////////////////////////////////*/
   String YOUR_CALL = "OK1HRA";        // master topic identification
   // byte NET_ID = 0x01;                 // NetID [hex] MUST BE UNIQUE IN NETWORK
@@ -80,22 +84,33 @@ How to setup
   bool Endstop = true;                // enable endstop reset
   bool StepperEnable = false;         // ENABLE switch current run/standby
                                       // DISABLE switch stepper enable/disable
-  byte mqttBroker[4]={54,38,157,134}; // MQTT broker IP address
+  byte mqttBroker[4]={192,168,1,200}; // MQTT broker IP address
 //////////////////////////////////////////////////////////////
 
-int CurrentRun = 25;                     // [0-31] current using during running stepper motor
 // C
-byte NET_ID = 0x00;                 // NetID [hex] MUST BE UNIQUE IN NETWORK
-bool Reverse = true;
-long SteppersCounterLimit=100*MicroSteps;
+// int CurrentRun = 20;                     // [0-31] current using during running stepper motor
+// byte NET_ID = 0x00;                 // NetID [hex] MUST BE UNIQUE IN NETWORK
+// bool Reverse = true;
+// long SteppersCounterLimit=518*MicroSteps;
+// float uStepTimeMultipler = 1;
+// //                                1    2   4   8   16 32 64 128 256
+// const unsigned int uStepTime[9]={2000,700,600,300,200,60,16, 11, 11};
+// const char* MQTT_ID = "OK1HRA-sm-00";
 
 // L
-// byte NET_ID = 0x01;                 // NetID [hex] MUST BE UNIQUE IN NETWORK
-// bool Reverse = false;
-// long SteppersCounterLimit=99200;    // 200*MicroSteps*31turn
+int CurrentRun = 25;                     // [0-31] current using during running stepper motor
+byte NET_ID = 0x01;                 // NetID [hex] MUST BE UNIQUE IN NETWORK
+bool Reverse = false;
+long SteppersCounterLimit=99200;    // 200*MicroSteps*31turn
+//                                1    2   4   8   16 32 64 128 256
+const unsigned int uStepTime[9]={2000,700,600,300,300,60,16, 11, 11};
+const char* MQTT_ID = "OK1HRA-sm-01";
+
+
+//////////////////////////////////////////////////////////////
 
 // #define SERIAL_debug             // Disable save 2% of program storage space
-const char* REV = "20201030";
+const char* REV = "20211227";
 #define EthModule             // enable Ethernet module if installed
 #define __USE_DHCP__          // enable DHCP
 #define HW_BCD_SW             // Enable hardware NET-ID bcd switch on bottom side
@@ -118,7 +133,7 @@ const int EndStopPin = 7;
 const int TxInhibitPin = 13;
 const int TempPin = A1;
 long EndstopDebounceTimer[2] = {0,1000};
-bool NeedPublishZero = false;
+// bool NeedPublishZero = false;
 
 // Serial
 const int BAUDRATE0 = 115200; // USB CLI/Debug
@@ -148,7 +163,7 @@ volatile int InDeCrement;
   // #include <Dhcp.h>
   // #include <EthernetServer.h>
   #include <SPI.h>
-  byte LastMac = 0x00 + NET_ID;
+  byte LastMac = 0x50 + NET_ID;
 
   byte mac[] = {0xDE, 0xAD, 0xBE, 0xdF, 0x22, LastMac};
   // byte mac[] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, LastMac};
@@ -191,7 +206,9 @@ void setup(){
     digitalWrite(TxInhibitPin, LOW);
   pinMode(TempPin, INPUT);
 
-  Serial.begin(BAUDRATE0, SERIAL_8N2);
+  #if defined(SERIAL_debug)
+    Serial.begin(BAUDRATE0, SERIAL_8N2);
+  #endif
 
   #if defined(EthModule)
     LastMac = 0x00 + NET_ID;
@@ -215,9 +232,9 @@ void setup(){
   //   SteppersCounter = SteppersCounterLimit;
   //   SteppersCounterTarget = 0;
   // }
-if(digitalRead(EndStopPin)==LOW){
-  NeedPublishZero=true;
-}
+// if(digitalRead(EndStopPin)==LOW){
+//   NeedPublishZero=true;
+// }
   // if(MicroSteps>1){
   //   StepperEnable = true;
   // }
@@ -235,6 +252,21 @@ void loop(){
   Mqtt();
   OnTheFlyStepperControl();
   StepperWatchdog();
+
+  static long WDTimer;
+  if ((millis() - WDTimer) > 60000){
+    MqttPubString("TempRAW", String(analogRead(TempPin)), false);
+    // MqttPubString("status", String(SteppersCounterTarget)+"|"+String(SteppersCounter)+"|"+String(StartUpTarget), false);
+    WDTimer=millis();
+  }
+
+  #if defined(SERIAL_debug)
+    static long WDTimer;
+    if ((millis() - WDTimer) > 1000){
+      Serial.print(F("."));
+      WDTimer=millis();
+    }
+  #endif
 }
 
 //------------------------------------------------------------------------------------
@@ -242,7 +274,8 @@ void loop(){
 
 void OnTheFlyStepperControl(){
   if(SteppersCounterTarget<=SteppersCounterLimit){
-    if(SteppersCounterTarget!=SteppersCounter && StartUpTarget==true){
+    // if(SteppersCounterTarget!=SteppersCounter && StartUpTarget==true){
+    if(SteppersCounterTarget!=SteppersCounter){
       #if defined(SERIAL_debug)
         MqttPubString("status", "RUN", false);
         Serial.print(F("RUN "));
@@ -253,7 +286,7 @@ void OnTheFlyStepperControl(){
       }
 
       digitalWrite(EN_PIN, LOW);    // LOW = enable
-      digitalWrite(TxInhibitPin, HIGH);
+      // digitalWrite(TxInhibitPin, HIGH);
 
       if(SteppersCounterTarget<SteppersCounter){
         digitalWrite(DIR_PIN, !Reverse);
@@ -293,8 +326,11 @@ void OnTheFlyStepperControl(){
       if(HomingReturn == true){
         SteppersCounterTarget = SteppersCounterTmp;
         HomingReturn= false;
+        if(StartUpTarget==false){
+          MqttPubString("Target", "20", false);
+        }
       }
-      MqttPubString("TempRAW", String(analogRead(TempPin)), false);
+      // MqttPubString("TempRAW", String(analogRead(TempPin)), false);
     }
   }else{
     #if defined(SERIAL_debug)
@@ -305,33 +341,33 @@ void OnTheFlyStepperControl(){
 }
 
 //------------------------------------------------------------------------------------
-void uStepSet(int us){
-  // Microstep long in uSeconds
-  switch (us) {
-      case 1: MicroSteps = 1 ; break;
-      case 2: MicroSteps = 2 ; break;
-      case 4: MicroSteps = 4 ; break;
-      case 8: MicroSteps = 8 ; break;
-      case 16: MicroSteps = 16 ; break;
-      case 32: MicroSteps = 32 ; break;
-      case 64: MicroSteps = 64 ; break;
-      case 128: MicroSteps = 128 ; break;
-      case 256: MicroSteps = 256 ; break;
-  }
-}
+// void uStepSet(int us){
+//   // Microstep long in uSeconds
+//   switch (us) {
+//       case 1: MicroSteps = 1 ; break;
+//       case 2: MicroSteps = 2 ; break;
+//       case 4: MicroSteps = 4 ; break;
+//       case 8: MicroSteps = 8 ; break;
+//       case 16: MicroSteps = 16 ; break;
+//       case 32: MicroSteps = 32 ; break;
+//       case 64: MicroSteps = 64 ; break;
+//       case 128: MicroSteps = 128 ; break;
+//       case 256: MicroSteps = 256 ; break;
+//   }
+// }
 //------------------------------------------------------------------------------------
 void uStepTouSeconds(){
   // Microstep long in uSeconds
   switch (MicroSteps) {
-      case 1: uSeconds = 2000 ; break;
-      case 2: uSeconds = 700 ; break;
-      case 4: uSeconds = 600 ; break;
-      case 8: uSeconds = 300 ; break;
-      case 16: uSeconds = 200 ; break;
-      case 32: uSeconds = 60 ; break;
-      case 64: uSeconds = 16 ; break;
-      case 128: uSeconds = 11 ; break;
-      case 256: uSeconds = 11 ; break;
+    case 1: uSeconds = uStepTime[0] ; break;
+    case 2: uSeconds = uStepTime[1] ; break;
+    case 4: uSeconds = uStepTime[2] ; break;
+    case 8: uSeconds = uStepTime[3] ; break;
+    case 16: uSeconds = uStepTime[4] ; break;
+    case 32: uSeconds = uStepTime[5] ; break;
+    case 64: uSeconds = uStepTime[6] ; break;
+    case 128: uSeconds = uStepTime[7] ; break;
+    case 256: uSeconds = uStepTime[8] ; break;
   }
 }
 //------------------------------------------------------------------------------------
@@ -349,8 +385,10 @@ void EndstopNow(){
   if(millis()-EndstopDebounceTimer[0]>EndstopDebounceTimer[1]){
     if(SteppersCounterTarget<SteppersCounter){
       SteppersCounter = 0-InDeCrement;
-      Homing = false;
-      HomingReturn = true;
+      if(Homing==true){
+        Homing = false;
+        HomingReturn = true;
+      }
     }
     EndstopDebounceTimer[0]=millis();
     #if defined(SERIAL_debug)
@@ -367,7 +405,7 @@ void StepperWatchdog(){
       }else{
         digitalWrite(EN_PIN, HIGH);    // HIGH = disable
       }
-      digitalWrite(TxInhibitPin, LOW);
+      // digitalWrite(TxInhibitPin, LOW);
     }
 }
 
@@ -415,6 +453,8 @@ void EthernetCheck(){
         // NeedRxSettings=1;
       }
       EthLinkStatusTimer[0]=millis();
+    }else if (Ethernet.linkStatus() == LinkON) {
+      // Serial.println(F("Ethernet LinkON"));
     }
   #endif
 }
@@ -462,7 +502,6 @@ void MqttRx(char *topic, byte *payload, unsigned int length) {
   CheckTopicBase = String(YOUR_CALL) + "/sm/" + String(NET_ID, HEX) + "/Target";
   if ( CheckTopicBase.equals( String(topic) )){
     unsigned long exp = 1;
-    Serial.println(p[0], DEC);
     // +
     if(p[0]==43){
       SteppersCounterTarget = SteppersCounter+MicroSteps;
@@ -471,10 +510,17 @@ void MqttRx(char *topic, byte *payload, unsigned int length) {
       SteppersCounterTarget = SteppersCounter-MicroSteps;
     // Homing
     }else if(p[0]==72){
-      SteppersCounterTmp = SteppersCounter;
-      SteppersCounter = SteppersCounterLimit*2;
-      SteppersCounterTarget = 0;
-      Homing = true;
+      if(digitalRead(EndStopPin)==HIGH){
+        SteppersCounterTmp = SteppersCounter;
+        SteppersCounter = SteppersCounterLimit*2;
+        SteppersCounterTarget = 0;
+        Homing = true;
+      }else if(digitalRead(EndStopPin)==LOW && SteppersCounter==0){
+        SteppersCounterTarget = SteppersCounter+20*MicroSteps;
+      }else if(digitalRead(EndStopPin)==LOW && SteppersCounter>0){
+        SteppersCounterTarget=SteppersCounter;
+        SteppersCounter=0;
+      }
     }else{
       SteppersCounterTarget = 0;
       for (int i = length-1; i >=0 ; i--) {
@@ -495,6 +541,15 @@ void MqttRx(char *topic, byte *payload, unsigned int length) {
     #endif
   }
 
+  // L match high impedance switch detect
+  CheckTopicBase = String(YOUR_CALL) + "/sm/" + String(NET_ID, HEX) + "/sL";
+  if ( CheckTopicBase.equals( String(topic) )){
+    if(p[0] == 48){
+      digitalWrite(TxInhibitPin, LOW);
+    }else{
+      digitalWrite(TxInhibitPin, HIGH);
+    }
+  }
 
   // SteppersCounterLimit
   CheckTopicBase = String(YOUR_CALL) + "/sm/" + String(NET_ID, HEX) + "/sSteppersCounterLimit";
@@ -585,7 +640,7 @@ void MqttRx(char *topic, byte *payload, unsigned int length) {
 }
 //-------------------------------------------------------------------------------------------------------
 bool mqttReconnect() {
-  if (mqttClient.connect(mac)) {
+  if (mqttClient.connect(MQTT_ID)) {
     // InterruptON(0,0,0,0); // keyb, enc, gps, Interlock
     IPAddress IPlocalAddr = Ethernet.localIP();                           // get
     String IPlocalAddrString = String(IPlocalAddr[0]) + "." + String(IPlocalAddr[1]) + "." + String(IPlocalAddr[2]) + "." + String(IPlocalAddr[3]);   // to string
@@ -593,11 +648,10 @@ bool mqttReconnect() {
     MqttPubString("IP", IPlocalAddrString, true);
     MqttPubString("REV", REV, false);
     MqttListSettings();
-    if(NeedPublishZero==true){
-      MqttPubString("sTarget", "0", true);
-      NeedPublishZero=false;
-    }
-
+    // if(NeedPublishZero==true){
+    //   MqttPubString("sTarget", "0", true);
+    //   NeedPublishZero=false;
+    // }
 
     #if defined(SERIAL_debug)
       Serial.print(F("MQTT connected "));
@@ -657,16 +711,25 @@ bool mqttReconnect() {
         #endif
       }
 
+      // // MicroSteps
+      // topic = String(YOUR_CALL) + "/sm/" + String(NET_ID, HEX) + "/sMicroSteps";
+      // topic.reserve(30);
+      // const char *cstr5 = topic.c_str();
+      // if(mqttClient.subscribe(cstr5)==true){
+      //   #if defined(SERIAL_debug)
+      //     Serial.println(F("sMicroSteps"));
+      //   #endif
+      // }
+
       // MicroSteps
-      topic = String(YOUR_CALL) + "/sm/" + String(NET_ID, HEX) + "/sMicroSteps";
+      topic = String(YOUR_CALL) + "/sm/" + String(NET_ID, HEX) + "/sL";
       topic.reserve(30);
-      const char *cstr5 = topic.c_str();
-      if(mqttClient.subscribe(cstr5)==true){
+      const char *cstr6 = topic.c_str();
+      if(mqttClient.subscribe(cstr6)==true){
         #if defined(SERIAL_debug)
-          Serial.println(F("sMicroSteps"));
+          Serial.println(F("sL"));
         #endif
       }
-
     // InterruptON(1,1,1,1); // keyb, enc, gps, Interlock
   }
   return mqttClient.connected();
@@ -735,7 +798,8 @@ void MqttPubString(String TOPIC, String DATA, bool RETAIN){
   // InterruptON(0,0,0); // keyb, enc, gps
   if(EthLinkStatus==1 && mqttClient.connected()==true){
     // InterruptON(0,0,0,0); // keyb, enc, gps, Interlock
-    if (mqttClient.connect(charbuf)) {
+    // if (mqttClient.connect(charbuf)) {
+    if (mqttClient.connect(MQTT_ID)) {
       TOPIC = String(YOUR_CALL) + "/sm/" + String(NET_ID, HEX) + "/" + TOPIC;
       TOPIC.toCharArray( mqttPath, 128 );
       DATA.toCharArray( mqttTX, 128 );
